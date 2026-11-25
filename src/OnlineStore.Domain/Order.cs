@@ -9,11 +9,13 @@ public class Order
     public OrderStatus Status { get; private set; }
     public IReadOnlyCollection<OrderItem> Items => _items;
 
+    public decimal Total => _items.Sum(item => item.GetTotalPrice());
+
     public Order(int id, Customer customer)
     {
         Id = id;
         Customer = customer;
-        Status = OrderStatus.New;
+        Status = OrderStatus.Created;
     }
 
     public void AddItem(Product product, int quantity)
@@ -24,7 +26,8 @@ public class Order
 
     public void RemoveItem(Product product)
     {
-        var item = _items.FirstOrDefault(x => x.Product.Id == product.Id);
+        var item = _items.FirstOrDefault(
+            x => x.Product.Id == product.Id);
 
         if (item != null)
         {
@@ -36,27 +39,54 @@ public class Order
     {
         if (Status == OrderStatus.Paid)
         {
-            throw new InvalidOperationException("Order is already paid.");
+            throw new InvalidOperationException(
+                "Order is already paid.");
         }
 
         if (Status == OrderStatus.Cancelled)
         {
-            throw new InvalidOperationException("Cancelled order cannot be paid.");
+            throw new InvalidOperationException(
+                "Cancelled order cannot be paid.");
         }
 
-        decimal totalAmount = 0;
-
-        foreach (var item in _items)
-        {
-            totalAmount += item.GetTotalPrice();
-        }
-
-        paymentMethod.Pay(totalAmount);
+        paymentMethod.Pay(Total);
         Status = OrderStatus.Paid;
     }
 
     public void Cancel()
     {
         Status = OrderStatus.Cancelled;
+    }
+
+    public string GetStatusDescription()
+    {
+        return Status switch
+        {
+            OrderStatus.Created => "Order created",
+            OrderStatus.Paid => "Order paid",
+            OrderStatus.Shipped => "Order shipped",
+            OrderStatus.Delivered => "Order delivered",
+            OrderStatus.Cancelled => "Order cancelled",
+            _ => "Unknown status"
+        };
+    }
+
+    public string GetOrderCategory()
+    {
+        return Total switch
+        {
+            < 500m => "Small",
+            < 5000m => "Medium",
+            _ => "Large"
+        };
+    }
+
+    public bool HasFreeDelivery()
+    {
+        return this is
+        {
+            Status: OrderStatus.Paid,
+            Total: >= 2000m
+        };
     }
 }
