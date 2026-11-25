@@ -2,14 +2,9 @@ namespace OnlineStore.Domain;
 
 public class Customer
 {
-    public int Id { get; }
-    public string Name { get; }
-    public string Email { get; }
-
-    public Customer(int id, string name, string email)
-    {
-        Id = id;
-        Name = name;
-        Email = email;
-    }
+    public int Id { get; init; }
+    public required string Name { get; init; }
+    public required string Email { get; init; }
+    public required Address Address { get; init; }
+    public string? PhoneNumber { get; init; }
 }
