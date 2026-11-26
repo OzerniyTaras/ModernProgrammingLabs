@@ -1,3 +1,4 @@
+
 namespace OnlineStore.Domain;
 
 public class Order
@@ -9,7 +10,8 @@ public class Order
     public OrderStatus Status { get; private set; }
     public IReadOnlyCollection<OrderItem> Items => _items;
 
-    public decimal Total => _items.Sum(item => item.GetTotalPrice());
+    public decimal Total => _items.Sum(
+        item => item.GetTotalPrice());
 
     public Order(int id, Customer customer)
     {
@@ -22,6 +24,9 @@ public class Order
     {
         var item = new OrderItem(product, quantity);
         _items.Add(item);
+
+        DomainLogger.Logger(
+            $"Order #{Id}: Added {product.Name}, quantity: {quantity}");
     }
 
     public void RemoveItem(Product product)
@@ -51,11 +56,17 @@ public class Order
 
         paymentMethod.Pay(Total);
         Status = OrderStatus.Paid;
+
+        DomainLogger.Logger(
+            $"Order #{Id}: Payment completed. Total: {Total}");
     }
 
     public void Cancel()
     {
         Status = OrderStatus.Cancelled;
+
+        DomainLogger.Logger(
+            $"Order #{Id}: Order cancelled.");
     }
 
     public string GetStatusDescription()
