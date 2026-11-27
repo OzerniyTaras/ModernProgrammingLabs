@@ -1,7 +1,7 @@
 ﻿using OnlineStore.Domain;
 
-Console.WriteLine("Online Store - Laboratory Work 5");
-Console.WriteLine("Delegates, Lambda Expressions and Events");
+Console.WriteLine("Online Store - Laboratory Work 6");
+Console.WriteLine("Validation and Exception Handling");
 Console.WriteLine("========================================");
 
 var customer = new Customer
@@ -19,76 +19,234 @@ var mouse = new Product(2, "Mouse", 600m);
 
 var order = new Order(1, customer);
 
-// 1. Action
-Console.WriteLine("\n1. Action - domain operations");
+// 1. Valid operation
+RunOperation("Add valid products", () =>
+{
+    order.AddItem(laptop, 1);
+    order.AddItem(mouse, 2);
+});
 
-order.AddItem(laptop, 1);
-order.AddItem(mouse, 2);
+PrintOrderState(order);
 
-// 2. Func and lambda expressions
-Console.WriteLine("\n2. Func - discount policies");
+// 2. Invalid product name
+RunOperation("Create product with empty name", () =>
+{
+    var product = new Product(3, "", 100m);
+});
 
-Console.WriteLine($"Original total: {order.Total:F2}");
+// 3. Invalid product price
+RunOperation("Create product with negative price", () =>
+{
+    var product = new Product(3, "Keyboard", -100m);
+});
 
-Console.WriteLine($"No discount: " +
-    $"{DiscountPolicies.ApplyDiscount(order.Total,
-        DiscountPolicies.NoDiscount):F2}");
+// 4. Invalid quantity
+RunOperation("Add product with negative quantity", () =>
+{
+    order.AddItem(mouse, -2);
+});
 
-Console.WriteLine($"10% discount: " +
-    $"{DiscountPolicies.ApplyDiscount(order.Total,
-        DiscountPolicies.TenPercentDiscount):F2}");
+PrintOrderState(order);
 
-Console.WriteLine($"20% discount: " +
-    $"{DiscountPolicies.ApplyDiscount(order.Total,
-        DiscountPolicies.TwentyPercentDiscount):F2}");
-
-// 3. Predicate
-Console.WriteLine("\n3. Predicate - expensive orders");
-
-bool isExpensive = OrderPredicates.IsExpensive(order);
-
-Console.WriteLine($"Order total >= 5000: {isExpensive}");
-
-// 4. Events and subscribers
-Console.WriteLine("\n4. Event - OrderPaid");
-
+// 5. Successful payment
 var notificationService = new NotificationService();
 var loggingService = new LoggingService();
 
 order.OrderPaid += notificationService.OnOrderPaid;
 order.OrderPaid += loggingService.OnOrderPaid;
 
-order.Pay(new CardPayment());
+RunOperation("Pay order", () =>
+{
+    order.Pay(new CardPayment());
+});
 
-Console.WriteLine($"Order status: {order.Status}");
+PrintOrderState(order);
 
-order.OrderPaid -= notificationService.OnOrderPaid;
-order.OrderPaid -= loggingService.OnOrderPaid;
+// 6. Repeated payment
+RunOperation("Pay the same order again", () =>
+{
+    order.Pay(new CardPayment());
+});
 
-// 5. Cancellation
-Console.WriteLine("\n5. Action - order cancellation");
+// 7. Modify paid order
+RunOperation("Add item to paid order", () =>
+{
+    order.AddItem(mouse, 1);
+});
 
-var secondOrder = new Order(2, customer);
+RunOperation("Remove item from paid order", () =>
+{
+    order.RemoveItem(laptop);
+});
 
-secondOrder.AddItem(mouse, 1);
-secondOrder.Cancel();
+PrintOrderState(order);
 
-Console.WriteLine($"Order status: {secondOrder.Status}");
+// 8. Cancelled order
+var cancelledOrder = new Order(2, customer);
+cancelledOrder.AddItem(mouse, 1);
+cancelledOrder.Cancel();
 
-// 6. Extension methods
-Console.WriteLine("\n6. Extension Methods");
+RunOperation("Pay cancelled order", () =>
+{
+    cancelledOrder.Pay(new CardPayment());
+});
 
-Console.WriteLine($"Order #1 is large: {order.IsLargeOrder()}");
-Console.WriteLine(order.GetSummary());
+RunOperation("Modify cancelled order", () =>
+{
+    cancelledOrder.AddItem(laptop, 1);
+});
 
-Console.WriteLine($"Order #2 is large: {secondOrder.IsLargeOrder()}");
-Console.WriteLine(secondOrder.GetSummary());
+PrintOrderState(cancelledOrder);
 
-// 7. C# 14 Extension Blocks
-Console.WriteLine("\n7. C# 14 Extension Blocks");
+// 9. Custom domain exception
+var emptyOrder = new Order(3, customer);
 
-Console.WriteLine($"Order #1 is paid: {order.IsPaid()}");
-Console.WriteLine($"Order #2 is paid: {secondOrder.IsPaid()}");
+RunOperation("Pay empty order", () =>
+{
+    emptyOrder.Pay(new CardPayment());
+});
+
+PrintOrderState(emptyOrder);
+
+// 10. Failed payment and event verification
+Console.WriteLine("\n========================================");
+Console.WriteLine("Failed Payment and Event Verification");
+Console.WriteLine("========================================");
+
+var failedOrder = new Order(4, customer);
+failedOrder.AddItem(laptop, 1);
+failedOrder.AddItem(mouse, 2);
+
+int eventCount = 0;
+
+failedOrder.OrderPaid += notificationService.OnOrderPaid;
+failedOrder.OrderPaid += loggingService.OnOrderPaid;
+failedOrder.OrderPaid += _ => eventCount++;
+
+var statusBefore = failedOrder.Status;
+var countBefore = failedOrder.Items.Count;
+var totalBefore = failedOrder.Total;
+
+Console.WriteLine("\nBefore failed payment:");
+PrintOrderState(failedOrder);
+Console.WriteLine($"OrderPaid event count: {eventCount}");
+
+RunOperation("Attempt declined payment", () =>
+{
+    failedOrder.Pay(new FailedPayment());
+});
+
+Console.WriteLine("\nAfter failed payment:");
+PrintOrderState(failedOrder);
+Console.WriteLine($"OrderPaid event count: {eventCount}");
+
+bool stateUnchanged =
+    failedOrder.Status == statusBefore &&
+    failedOrder.Items.Count == countBefore &&
+    failedOrder.Total == totalBefore;
+
+bool eventNotRaised = eventCount == 0;
+
+Console.WriteLine("\nVerification results:");
+Console.WriteLine($"Order state unchanged: {stateUnchanged}");
+Console.WriteLine($"OrderPaid event not raised: {eventNotRaised}");
+
+Console.WriteLine(
+    $"Failed payment test: " +
+    $"{(stateUnchanged && eventNotRaised ? "PASSED" : "FAILED")}");
+
+// Successful payment after failed attempt
+RunOperation("Retry payment successfully", () =>
+{
+    failedOrder.Pay(new CardPayment());
+});
+
+PrintOrderState(failedOrder);
+Console.WriteLine($"OrderPaid event count: {eventCount}");
+
+bool retrySuccessful =
+    failedOrder.Status == OrderStatus.Paid &&
+    eventCount == 1;
+
+Console.WriteLine(
+    $"Successful retry test: " +
+    $"{(retrySuccessful ? "PASSED" : "FAILED")}");
+
+// 11. TryParse demonstration
+Console.WriteLine("\n========================================");
+Console.WriteLine("TryParse - User Input");
+Console.WriteLine("========================================");
+
+var inputOrder = new Order(5, customer);
+
+while (true)
+{
+    Console.Write("Enter mouse quantity: ");
+
+    string? input = Console.ReadLine();
+
+    if (input is null)
+    {
+        Console.WriteLine("Input ended.");
+        break;
+    }
+
+    if (!int.TryParse(input, out int quantity))
+    {
+        Console.WriteLine("Error: Enter a valid integer.");
+        continue;
+    }
+
+    if (quantity <= 0)
+    {
+        Console.WriteLine(
+            "Error: Quantity must be greater than zero.");
+        continue;
+    }
+
+    RunOperation("Add product using user input", () =>
+    {
+        inputOrder.AddItem(mouse, quantity);
+    });
+
+    PrintOrderState(inputOrder);
+    break;
+}
 
 Console.WriteLine("\n========================================");
 Console.WriteLine("Demonstration completed.");
+
+static void RunOperation(string operation, Action action)
+{
+    Console.WriteLine($"\nOperation: {operation}");
+
+    try
+    {
+        action();
+        Console.WriteLine("Result: Success");
+    }
+    catch (DomainRuleViolationException ex)
+    {
+        Console.WriteLine($"Domain rule error: {ex.Message}");
+    }
+    catch (ArgumentOutOfRangeException ex)
+    {
+        Console.WriteLine($"Range error: {ex.Message}");
+    }
+    catch (ArgumentException ex)
+    {
+        Console.WriteLine($"Argument error: {ex.Message}");
+    }
+    catch (InvalidOperationException ex)
+    {
+        Console.WriteLine($"Operation error: {ex.Message}");
+    }
+}
+
+static void PrintOrderState(Order order)
+{
+    Console.WriteLine($"Order ID: {order.Id}");
+    Console.WriteLine($"Order status: {order.Status}");
+    Console.WriteLine($"Order items count: {order.Items.Count}");
+    Console.WriteLine($"Order total: {order.Total:F2}");
+}
