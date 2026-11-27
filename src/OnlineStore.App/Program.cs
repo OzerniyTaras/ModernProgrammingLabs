@@ -1,10 +1,38 @@
 ﻿using OnlineStore.Domain;
+using OnlineStore.App;
+using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 
-Console.WriteLine("Online Store - Laboratory Work 6");
-Console.WriteLine("Validation and Exception Handling");
+Console.WriteLine("Online Store - Laboratory Work 7");
+Console.WriteLine("JSON, Files and Configuration");
 Console.WriteLine("========================================");
 
-var customer = new Customer
+// Load configuration
+string configFile = Path.Combine(
+    AppContext.BaseDirectory, "appsettings.json");
+
+var config = new ConfigurationBuilder()
+    .AddJsonFile(configFile, optional: false)
+    .Build();
+
+string relativePath = config["Storage:FilePath"]
+    ?? throw new InvalidOperationException(
+        "Storage:FilePath is not configured.");
+
+string filePath = Path.Combine(
+    AppContext.BaseDirectory, relativePath);
+
+string dataDirectory = Path.GetDirectoryName(filePath)!;
+
+Console.WriteLine("\nApplication Configuration");
+Console.WriteLine("========================================");
+Console.WriteLine($"Configuration file: {configFile}");
+Console.WriteLine($"Storage:FilePath = {relativePath}");
+Console.WriteLine($"Full report path: {filePath}");
+Console.WriteLine("Configuration loaded successfully.");
+Console.WriteLine("========================================");
+
+var customer1 = new Customer
 {
     Id = 1,
     Name = "Taras",
@@ -14,239 +42,230 @@ var customer = new Customer
     PhoneNumber = null
 };
 
+var customer2 = new Customer
+{
+    Id = 2,
+    Name = "Anna",
+    Email = "anna@gmail.com",
+    Address = new Address(
+        "Kyiv", "Khreshchatyk", "15", "01001"),
+    PhoneNumber = null
+};
+
+var customer3 = new Customer
+{
+    Id = 3,
+    Name = "Ivan",
+    Email = "ivan@gmail.com",
+    Address = new Address(
+        "Lviv", "Franko", "20", "79000"),
+    PhoneNumber = null
+};
+
 var laptop = new Product(1, "Laptop", 28000m);
 var mouse = new Product(2, "Mouse", 600m);
+var keyboard = new Product(3, "Keyboard", 1500m);
+var monitor = new Product(4, "Monitor", 8500m);
+var headphones = new Product(5, "Headphones", 2200m);
 
-var order = new Order(1, customer);
+// Order 1
+var order1 = new Order(1, customer1);
+order1.AddItem(laptop, 1);
+order1.AddItem(mouse, 2);
+order1.Pay(new CardPayment());
 
-// 1. Valid operation
-RunOperation("Add valid products", () =>
+// Order 2
+var order2 = new Order(2, customer2);
+order2.AddItem(keyboard, 1);
+order2.AddItem(mouse, 1);
+order2.Pay(new CardPayment());
+
+// Order 3
+var order3 = new Order(3, customer3);
+order3.AddItem(monitor, 2);
+
+// Order 4
+var order4 = new Order(4, customer1);
+order4.AddItem(headphones, 1);
+order4.Cancel();
+
+// Order 5
+var order5 = new Order(5, customer2);
+order5.AddItem(laptop, 1);
+order5.AddItem(monitor, 1);
+order5.AddItem(keyboard, 1);
+order5.Pay(new CardPayment());
+
+var orders = new List<Order>
 {
-    order.AddItem(laptop, 1);
-    order.AddItem(mouse, 2);
-});
+    order1,
+    order2,
+    order3,
+    order4,
+    order5
+};
 
-PrintOrderState(order);
+var reports = OrderReportService.CreateReport(orders);
 
-// 2. Invalid product name
-RunOperation("Create product with empty name", () =>
-{
-    var product = new Product(3, "", 100m);
-});
-
-// 3. Invalid product price
-RunOperation("Create product with negative price", () =>
-{
-    var product = new Product(3, "Keyboard", -100m);
-});
-
-// 4. Invalid quantity
-RunOperation("Add product with negative quantity", () =>
-{
-    order.AddItem(mouse, -2);
-});
-
-PrintOrderState(order);
-
-// 5. Successful payment
-var notificationService = new NotificationService();
-var loggingService = new LoggingService();
-
-order.OrderPaid += notificationService.OnOrderPaid;
-order.OrderPaid += loggingService.OnOrderPaid;
-
-RunOperation("Pay order", () =>
-{
-    order.Pay(new CardPayment());
-});
-
-PrintOrderState(order);
-
-// 6. Repeated payment
-RunOperation("Pay the same order again", () =>
-{
-    order.Pay(new CardPayment());
-});
-
-// 7. Modify paid order
-RunOperation("Add item to paid order", () =>
-{
-    order.AddItem(mouse, 1);
-});
-
-RunOperation("Remove item from paid order", () =>
-{
-    order.RemoveItem(laptop);
-});
-
-PrintOrderState(order);
-
-// 8. Cancelled order
-var cancelledOrder = new Order(2, customer);
-cancelledOrder.AddItem(mouse, 1);
-cancelledOrder.Cancel();
-
-RunOperation("Pay cancelled order", () =>
-{
-    cancelledOrder.Pay(new CardPayment());
-});
-
-RunOperation("Modify cancelled order", () =>
-{
-    cancelledOrder.AddItem(laptop, 1);
-});
-
-PrintOrderState(cancelledOrder);
-
-// 9. Custom domain exception
-var emptyOrder = new Order(3, customer);
-
-RunOperation("Pay empty order", () =>
-{
-    emptyOrder.Pay(new CardPayment());
-});
-
-PrintOrderState(emptyOrder);
-
-// 10. Failed payment and event verification
 Console.WriteLine("\n========================================");
-Console.WriteLine("Failed Payment and Event Verification");
+Console.WriteLine("Order Report");
 Console.WriteLine("========================================");
 
-var failedOrder = new Order(4, customer);
-failedOrder.AddItem(laptop, 1);
-failedOrder.AddItem(mouse, 2);
-
-int eventCount = 0;
-
-failedOrder.OrderPaid += notificationService.OnOrderPaid;
-failedOrder.OrderPaid += loggingService.OnOrderPaid;
-failedOrder.OrderPaid += _ => eventCount++;
-
-var statusBefore = failedOrder.Status;
-var countBefore = failedOrder.Items.Count;
-var totalBefore = failedOrder.Total;
-
-Console.WriteLine("\nBefore failed payment:");
-PrintOrderState(failedOrder);
-Console.WriteLine($"OrderPaid event count: {eventCount}");
-
-RunOperation("Attempt declined payment", () =>
+foreach (var report in reports)
 {
-    failedOrder.Pay(new FailedPayment());
-});
+    Console.WriteLine($"Order ID: {report.OrderId}");
+    Console.WriteLine($"Customer: {report.CustomerName}");
+    Console.WriteLine($"Total: {report.Total:F2}");
+    Console.WriteLine($"Status: {report.Status}");
+    Console.WriteLine($"Items count: {report.ItemsCount}");
+    Console.WriteLine("----------------------------------------");
+}
 
-Console.WriteLine("\nAfter failed payment:");
-PrintOrderState(failedOrder);
-Console.WriteLine($"OrderPaid event count: {eventCount}");
+Console.WriteLine($"Total orders: {reports.Count}");
+Console.WriteLine($"Total amount: {reports.Sum(r => r.Total):F2}");
 
-bool stateUnchanged =
-    failedOrder.Status == statusBefore &&
-    failedOrder.Items.Count == countBefore &&
-    failedOrder.Total == totalBefore;
-
-bool eventNotRaised = eventCount == 0;
-
-Console.WriteLine("\nVerification results:");
-Console.WriteLine($"Order state unchanged: {stateUnchanged}");
-Console.WriteLine($"OrderPaid event not raised: {eventNotRaised}");
-
-Console.WriteLine(
-    $"Failed payment test: " +
-    $"{(stateUnchanged && eventNotRaised ? "PASSED" : "FAILED")}");
-
-// Successful payment after failed attempt
-RunOperation("Retry payment successfully", () =>
+// JSON export and import
+try
 {
-    failedOrder.Pay(new CardPayment());
-});
+    Console.WriteLine("\n========================================");
+    Console.WriteLine("JSON File Export");
+    Console.WriteLine("========================================");
 
-PrintOrderState(failedOrder);
-Console.WriteLine($"OrderPaid event count: {eventCount}");
+    await JsonReportStorage.SaveAsync(reports, filePath);
 
-bool retrySuccessful =
-    failedOrder.Status == OrderStatus.Paid &&
-    eventCount == 1;
+    Console.WriteLine("Report successfully saved to JSON.");
+    Console.WriteLine($"File path: {filePath}");
+    Console.WriteLine($"Exported records: {reports.Count}");
+    Console.WriteLine($"File exists: {File.Exists(filePath)}");
 
-Console.WriteLine(
-    $"Successful retry test: " +
-    $"{(retrySuccessful ? "PASSED" : "FAILED")}");
+    Console.WriteLine("\n========================================");
+    Console.WriteLine("JSON File Import");
+    Console.WriteLine("========================================");
 
-// 11. TryParse demonstration
-Console.WriteLine("\n========================================");
-Console.WriteLine("TryParse - User Input");
-Console.WriteLine("========================================");
+    var loadedReports =
+        await JsonReportStorage.LoadAsync(filePath);
 
-var inputOrder = new Order(5, customer);
+    Console.WriteLine("Report successfully loaded from JSON.");
 
-while (true)
-{
-    Console.Write("Enter mouse quantity: ");
-
-    string? input = Console.ReadLine();
-
-    if (input is null)
-    {
-        Console.WriteLine("Input ended.");
-        break;
-    }
-
-    if (!int.TryParse(input, out int quantity))
-    {
-        Console.WriteLine("Error: Enter a valid integer.");
-        continue;
-    }
-
-    if (quantity <= 0)
+    foreach (var report in loadedReports)
     {
         Console.WriteLine(
-            "Error: Quantity must be greater than zero.");
-        continue;
+            $"Order #{report.OrderId} | " +
+            $"{report.CustomerName} | " +
+            $"{report.Total:F2} | " +
+            $"{report.Status} | " +
+            $"Items: {report.ItemsCount}");
     }
 
-    RunOperation("Add product using user input", () =>
-    {
-        inputOrder.AddItem(mouse, quantity);
-    });
+    Console.WriteLine("----------------------------------------");
+    Console.WriteLine($"Loaded records: {loadedReports.Count}");
+    Console.WriteLine(
+        $"Loaded total amount: {loadedReports.Sum(r => r.Total):F2}");
 
-    PrintOrderState(inputOrder);
-    break;
+    bool countMatches =
+        reports.Count == loadedReports.Count;
+
+    bool totalMatches =
+        reports.Sum(r => r.Total) ==
+        loadedReports.Sum(r => r.Total);
+
+    bool dataMatches =
+        reports.SequenceEqual(loadedReports);
+
+    Console.WriteLine("\nVerification results:");
+    Console.WriteLine($"Record count matches: {countMatches}");
+    Console.WriteLine($"Total amount matches: {totalMatches}");
+    Console.WriteLine($"All report data matches: {dataMatches}");
+
+    Console.WriteLine(
+        $"JSON round-trip test: " +
+        $"{(countMatches && totalMatches && dataMatches ? "PASSED" : "FAILED")}");
 }
+catch (FileNotFoundException ex)
+{
+    Console.WriteLine($"File not found: {ex.Message}");
+}
+catch (JsonException ex)
+{
+    Console.WriteLine($"JSON error: {ex.Message}");
+}
+catch (UnauthorizedAccessException ex)
+{
+    Console.WriteLine($"Access denied: {ex.Message}");
+}
+catch (IOException ex)
+{
+    Console.WriteLine($"File operation error: {ex.Message}");
+}
+
+// Error handling demonstration
+Console.WriteLine("\n========================================");
+Console.WriteLine("File and JSON Error Handling");
+Console.WriteLine("========================================");
+
+// Test 1: Missing file
+Console.WriteLine("\nTest 1: Missing JSON file");
+
+string missingFilePath = Path.Combine(
+    dataDirectory, $"{Guid.NewGuid():N}.json");
+
+try
+{
+    await JsonReportStorage.LoadAsync(missingFilePath);
+
+    Console.WriteLine("Missing file test: FAILED");
+}
+catch (FileNotFoundException)
+{
+    Console.WriteLine("Error: JSON file was not found.");
+    Console.WriteLine("Missing file test: PASSED");
+}
+catch (DirectoryNotFoundException)
+{
+    Console.WriteLine("Error: JSON directory was not found.");
+    Console.WriteLine("Missing file test: PASSED");
+}
+catch (UnauthorizedAccessException ex)
+{
+    Console.WriteLine($"Access denied: {ex.Message}");
+}
+catch (IOException ex)
+{
+    Console.WriteLine($"File operation error: {ex.Message}");
+}
+
+// Test 2: Invalid JSON
+Console.WriteLine("\nTest 2: Invalid JSON content");
+
+string invalidFilePath = Path.Combine(
+    dataDirectory, "invalid-report.json");
+
+try
+{
+    Directory.CreateDirectory(dataDirectory);
+
+    await File.WriteAllTextAsync(
+        invalidFilePath, "{ invalid json }");
+
+    await JsonReportStorage.LoadAsync(invalidFilePath);
+
+    Console.WriteLine("Invalid JSON test: FAILED");
+}
+catch (JsonException)
+{
+    Console.WriteLine("Error: Invalid JSON format.");
+    Console.WriteLine("Invalid JSON test: PASSED");
+}
+catch (UnauthorizedAccessException ex)
+{
+    Console.WriteLine($"Access denied: {ex.Message}");
+}
+catch (IOException ex)
+{
+    Console.WriteLine($"File operation error: {ex.Message}");
+}
+
+Console.WriteLine("\nProgram continues after error handling.");
 
 Console.WriteLine("\n========================================");
 Console.WriteLine("Demonstration completed.");
-
-static void RunOperation(string operation, Action action)
-{
-    Console.WriteLine($"\nOperation: {operation}");
-
-    try
-    {
-        action();
-        Console.WriteLine("Result: Success");
-    }
-    catch (DomainRuleViolationException ex)
-    {
-        Console.WriteLine($"Domain rule error: {ex.Message}");
-    }
-    catch (ArgumentOutOfRangeException ex)
-    {
-        Console.WriteLine($"Range error: {ex.Message}");
-    }
-    catch (ArgumentException ex)
-    {
-        Console.WriteLine($"Argument error: {ex.Message}");
-    }
-    catch (InvalidOperationException ex)
-    {
-        Console.WriteLine($"Operation error: {ex.Message}");
-    }
-}
-
-static void PrintOrderState(Order order)
-{
-    Console.WriteLine($"Order ID: {order.Id}");
-    Console.WriteLine($"Order status: {order.Status}");
-    Console.WriteLine($"Order items count: {order.Items.Count}");
-    Console.WriteLine($"Order total: {order.Total:F2}");
-}
