@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 
 namespace OnlineStore.App;
 
@@ -11,9 +12,20 @@ public static class JsonReportStorage
         ArgumentNullException.ThrowIfNull(reports);
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
+        string configFile = Path.Combine(
+            AppContext.BaseDirectory, "appsettings.json");
+
+        var config = new ConfigurationBuilder()
+            .AddJsonFile(configFile, optional: false)
+            .Build();
+
+        bool writeIndented = bool.TryParse(
+            config["Storage:WriteIndented"],
+            out bool value) && value;
+
         var options = new JsonSerializerOptions
         {
-            WriteIndented = true
+            WriteIndented = writeIndented
         };
 
         string json = JsonSerializer.Serialize(
@@ -26,6 +38,9 @@ public static class JsonReportStorage
         Directory.CreateDirectory(directory);
 
         await File.WriteAllTextAsync(fullPath, json);
+
+        Console.WriteLine(
+            $"Storage:WriteIndented = {writeIndented}");
     }
 
     public static async Task<List<OrderReport>> LoadAsync(

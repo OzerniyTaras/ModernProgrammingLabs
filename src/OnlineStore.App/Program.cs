@@ -1,9 +1,35 @@
 ﻿using OnlineStore.Domain;
 using OnlineStore.App;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 
 Console.WriteLine("Online Store - Laboratory Work 7");
 Console.WriteLine("JSON, Files and Configuration");
+Console.WriteLine("========================================");
+
+// Load configuration
+string configFile = Path.Combine(
+    AppContext.BaseDirectory, "appsettings.json");
+
+var config = new ConfigurationBuilder()
+    .AddJsonFile(configFile, optional: false)
+    .Build();
+
+string relativePath = config["Storage:FilePath"]
+    ?? throw new InvalidOperationException(
+        "Storage:FilePath is not configured.");
+
+string filePath = Path.Combine(
+    AppContext.BaseDirectory, relativePath);
+
+string dataDirectory = Path.GetDirectoryName(filePath)!;
+
+Console.WriteLine("\nApplication Configuration");
+Console.WriteLine("========================================");
+Console.WriteLine($"Configuration file: {configFile}");
+Console.WriteLine($"Storage:FilePath = {relativePath}");
+Console.WriteLine($"Full report path: {filePath}");
+Console.WriteLine("Configuration loaded successfully.");
 Console.WriteLine("========================================");
 
 var customer1 = new Customer
@@ -98,12 +124,6 @@ foreach (var report in reports)
 Console.WriteLine($"Total orders: {reports.Count}");
 Console.WriteLine($"Total amount: {reports.Sum(r => r.Total):F2}");
 
-string dataDirectory = Path.Combine(
-    AppContext.BaseDirectory, "data");
-
-string filePath = Path.Combine(
-    dataDirectory, "report.json");
-
 // JSON export and import
 try
 {
@@ -149,7 +169,8 @@ try
         reports.Sum(r => r.Total) ==
         loadedReports.Sum(r => r.Total);
 
-    bool dataMatches = reports.SequenceEqual(loadedReports);
+    bool dataMatches =
+        reports.SequenceEqual(loadedReports);
 
     Console.WriteLine("\nVerification results:");
     Console.WriteLine($"Record count matches: {countMatches}");
