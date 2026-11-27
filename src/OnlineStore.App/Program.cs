@@ -1,5 +1,6 @@
 ﻿using OnlineStore.Domain;
 using OnlineStore.App;
+using System.Text.Json;
 
 Console.WriteLine("Online Store - Laboratory Work 7");
 Console.WriteLine("JSON, Files and Configuration");
@@ -78,7 +79,6 @@ var orders = new List<Order>
     order5
 };
 
-// Create report
 var reports = OrderReportService.CreateReport(orders);
 
 Console.WriteLine("\n========================================");
@@ -98,4 +98,153 @@ foreach (var report in reports)
 Console.WriteLine($"Total orders: {reports.Count}");
 Console.WriteLine($"Total amount: {reports.Sum(r => r.Total):F2}");
 
-Console.WriteLine("\nDemonstration completed.");
+string dataDirectory = Path.Combine(
+    AppContext.BaseDirectory, "data");
+
+string filePath = Path.Combine(
+    dataDirectory, "report.json");
+
+// JSON export and import
+try
+{
+    Console.WriteLine("\n========================================");
+    Console.WriteLine("JSON File Export");
+    Console.WriteLine("========================================");
+
+    await JsonReportStorage.SaveAsync(reports, filePath);
+
+    Console.WriteLine("Report successfully saved to JSON.");
+    Console.WriteLine($"File path: {filePath}");
+    Console.WriteLine($"Exported records: {reports.Count}");
+    Console.WriteLine($"File exists: {File.Exists(filePath)}");
+
+    Console.WriteLine("\n========================================");
+    Console.WriteLine("JSON File Import");
+    Console.WriteLine("========================================");
+
+    var loadedReports =
+        await JsonReportStorage.LoadAsync(filePath);
+
+    Console.WriteLine("Report successfully loaded from JSON.");
+
+    foreach (var report in loadedReports)
+    {
+        Console.WriteLine(
+            $"Order #{report.OrderId} | " +
+            $"{report.CustomerName} | " +
+            $"{report.Total:F2} | " +
+            $"{report.Status} | " +
+            $"Items: {report.ItemsCount}");
+    }
+
+    Console.WriteLine("----------------------------------------");
+    Console.WriteLine($"Loaded records: {loadedReports.Count}");
+    Console.WriteLine(
+        $"Loaded total amount: {loadedReports.Sum(r => r.Total):F2}");
+
+    bool countMatches =
+        reports.Count == loadedReports.Count;
+
+    bool totalMatches =
+        reports.Sum(r => r.Total) ==
+        loadedReports.Sum(r => r.Total);
+
+    bool dataMatches = reports.SequenceEqual(loadedReports);
+
+    Console.WriteLine("\nVerification results:");
+    Console.WriteLine($"Record count matches: {countMatches}");
+    Console.WriteLine($"Total amount matches: {totalMatches}");
+    Console.WriteLine($"All report data matches: {dataMatches}");
+
+    Console.WriteLine(
+        $"JSON round-trip test: " +
+        $"{(countMatches && totalMatches && dataMatches ? "PASSED" : "FAILED")}");
+}
+catch (FileNotFoundException ex)
+{
+    Console.WriteLine($"File not found: {ex.Message}");
+}
+catch (JsonException ex)
+{
+    Console.WriteLine($"JSON error: {ex.Message}");
+}
+catch (UnauthorizedAccessException ex)
+{
+    Console.WriteLine($"Access denied: {ex.Message}");
+}
+catch (IOException ex)
+{
+    Console.WriteLine($"File operation error: {ex.Message}");
+}
+
+// Error handling demonstration
+Console.WriteLine("\n========================================");
+Console.WriteLine("File and JSON Error Handling");
+Console.WriteLine("========================================");
+
+// Test 1: Missing file
+Console.WriteLine("\nTest 1: Missing JSON file");
+
+string missingFilePath = Path.Combine(
+    dataDirectory, $"{Guid.NewGuid():N}.json");
+
+try
+{
+    await JsonReportStorage.LoadAsync(missingFilePath);
+
+    Console.WriteLine("Missing file test: FAILED");
+}
+catch (FileNotFoundException)
+{
+    Console.WriteLine("Error: JSON file was not found.");
+    Console.WriteLine("Missing file test: PASSED");
+}
+catch (DirectoryNotFoundException)
+{
+    Console.WriteLine("Error: JSON directory was not found.");
+    Console.WriteLine("Missing file test: PASSED");
+}
+catch (UnauthorizedAccessException ex)
+{
+    Console.WriteLine($"Access denied: {ex.Message}");
+}
+catch (IOException ex)
+{
+    Console.WriteLine($"File operation error: {ex.Message}");
+}
+
+// Test 2: Invalid JSON
+Console.WriteLine("\nTest 2: Invalid JSON content");
+
+string invalidFilePath = Path.Combine(
+    dataDirectory, "invalid-report.json");
+
+try
+{
+    Directory.CreateDirectory(dataDirectory);
+
+    await File.WriteAllTextAsync(
+        invalidFilePath, "{ invalid json }");
+
+    await JsonReportStorage.LoadAsync(invalidFilePath);
+
+    Console.WriteLine("Invalid JSON test: FAILED");
+}
+catch (JsonException)
+{
+    Console.WriteLine("Error: Invalid JSON format.");
+    Console.WriteLine("Invalid JSON test: PASSED");
+}
+catch (UnauthorizedAccessException ex)
+{
+    Console.WriteLine($"Access denied: {ex.Message}");
+}
+catch (IOException ex)
+{
+    Console.WriteLine($"File operation error: {ex.Message}");
+}
+
+Console.WriteLine("\nProgram continues after error handling.");
+
+Console.WriteLine("\n========================================");
+Console.WriteLine("Demonstration completed.");
