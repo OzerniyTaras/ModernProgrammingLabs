@@ -1,4 +1,3 @@
-
 namespace OnlineStore.Domain;
 
 public class Order
@@ -9,6 +8,8 @@ public class Order
     public Customer Customer { get; }
     public OrderStatus Status { get; private set; }
     public IReadOnlyCollection<OrderItem> Items => _items;
+
+    public event Action<Order>? OrderPaid;
 
     public decimal Total => _items.Sum(
         item => item.GetTotalPrice());
@@ -59,6 +60,8 @@ public class Order
 
         DomainLogger.Logger(
             $"Order #{Id}: Payment completed. Total: {Total}");
+
+        OrderPaid?.Invoke(this);
     }
 
     public void Cancel()
