@@ -1,5 +1,4 @@
-﻿
-using OnlineStore.Domain;
+﻿using OnlineStore.Domain;
 
 Console.WriteLine("Online Store - Laboratory Work 5");
 Console.WriteLine("Delegates, Lambda Expressions and Events");
@@ -63,7 +62,6 @@ order.Pay(new CardPayment());
 
 Console.WriteLine($"Order status: {order.Status}");
 
-// Unsubscribe
 order.OrderPaid -= notificationService.OnOrderPaid;
 order.OrderPaid -= loggingService.OnOrderPaid;
 
@@ -76,6 +74,21 @@ secondOrder.AddItem(mouse, 1);
 secondOrder.Cancel();
 
 Console.WriteLine($"Order status: {secondOrder.Status}");
+
+// 6. Extension methods
+Console.WriteLine("\n6. Extension Methods");
+
+Console.WriteLine($"Order #1 is large: {order.IsLargeOrder()}");
+Console.WriteLine(order.GetSummary());
+
+Console.WriteLine($"Order #2 is large: {secondOrder.IsLargeOrder()}");
+Console.WriteLine(secondOrder.GetSummary());
+
+// 7. C# 14 Extension Blocks
+Console.WriteLine("\n7. C# 14 Extension Blocks");
+
+Console.WriteLine($"Order #1 is paid: {order.IsPaid()}");
+Console.WriteLine($"Order #2 is paid: {secondOrder.IsPaid()}");
 
 Console.WriteLine("\n========================================");
 Console.WriteLine("Demonstration completed.");
