@@ -8,10 +8,9 @@ public class Product
 
     public Product(int id, string name, decimal price)
     {
-        if (price <= 0)
-        {
-            throw new ArgumentException("Product price must be greater than 0.");
-        }
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(price);
 
         Id = id;
         Name = name;

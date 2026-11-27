@@ -7,7 +7,7 @@ public class Order
     public int Id { get; }
     public Customer Customer { get; }
     public OrderStatus Status { get; private set; }
-    public IReadOnlyCollection<OrderItem> Items => _items;
+    public IReadOnlyCollection<OrderItem> Items => _items.AsReadOnly();
 
     public event Action<Order>? OrderPaid;
 
@@ -16,6 +16,8 @@ public class Order
 
     public Order(int id, Customer customer)
     {
+        ArgumentNullException.ThrowIfNull(customer);
+
         Id = id;
         Customer = customer;
         Status = OrderStatus.Created;
@@ -23,6 +25,15 @@ public class Order
 
     public void AddItem(Product product, int quantity)
     {
+        ArgumentNullException.ThrowIfNull(product);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
+
+        if (Status != OrderStatus.Created)
+        {
+            throw new InvalidOperationException(
+                "Items can be changed only in a new order.");
+        }
+
         var item = new OrderItem(product, quantity);
         _items.Add(item);
 
@@ -32,6 +43,14 @@ public class Order
 
     public void RemoveItem(Product product)
     {
+        ArgumentNullException.ThrowIfNull(product);
+
+        if (Status != OrderStatus.Created)
+        {
+            throw new InvalidOperationException(
+                "Items can be changed only in a new order.");
+        }
+
         var item = _items.FirstOrDefault(
             x => x.Product.Id == product.Id);
 
@@ -43,6 +62,8 @@ public class Order
 
     public void Pay(IPaymentMethod paymentMethod)
     {
+        ArgumentNullException.ThrowIfNull(paymentMethod);
+
         if (Status == OrderStatus.Paid)
         {
             throw new InvalidOperationException(
@@ -55,7 +76,20 @@ public class Order
                 "Cancelled order cannot be paid.");
         }
 
+        if (Status != OrderStatus.Created)
+        {
+            throw new InvalidOperationException(
+                "Only a new order can be paid.");
+        }
+
+        if (_items.Count == 0)
+        {
+            throw new DomainRuleViolationException(
+                "An empty order cannot be paid.");
+        }
+
         paymentMethod.Pay(Total);
+
         Status = OrderStatus.Paid;
 
         DomainLogger.Logger(
@@ -66,6 +100,12 @@ public class Order
 
     public void Cancel()
     {
+        if (Status != OrderStatus.Created)
+        {
+            throw new InvalidOperationException(
+                "Only a new order can be cancelled.");
+        }
+
         Status = OrderStatus.Cancelled;
 
         DomainLogger.Logger(
